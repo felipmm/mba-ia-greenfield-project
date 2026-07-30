@@ -149,6 +149,39 @@ NestJS with standard module structure. Source lives in `src/`, compiled output i
 - Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
 - Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
 
+### Services (Docker Compose)
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `nestjs-api` | 3000 | NestJS API server (Express) |
+| `db` | 5432 | PostgreSQL 17 database |
+| `mailpit` | 1025, 8025 | SMTP testing server + web UI |
+| `redis` | 6379 | Redis 7 (BullMQ backing store) |
+| `minio` | 9000, 9001 | S3-compatible object storage + console |
+| `video-worker` | — | FFmpeg worker (consumes BullMQ jobs) |
+
+### Videos Module
+
+The `VideosModule` (`src/videos/`) manages the video lifecycle:
+
+- **Entity:** `Video` (`videos` table) — `url_hash` (Nano ID, unique), `status` enum (`draft`, `uploading`, `processing`, `ready`, `error`), storage keys for video and thumbnail files, metadata fields (duration, resolution, codec, bitrate), `channel_id` FK.
+- **Upload flow:** `POST /videos/initiate-upload` → MinIO multipart upload with presigned URLs → `POST /videos/:id/complete-upload` → BullMQ job → worker processes.
+- **Streaming:** `GET /videos/:urlHash/stream` — HTTP Range request proxy to MinIO, supports `206 Partial Content`.
+- **Download:** `GET /videos/:urlHash/download` — redirects to a presigned MinIO URL.
+- All video endpoints are protected by JWT auth except streaming and download (public).
+
+### Storage Module
+
+`StorageModule` (`src/storage/`) is `@Global()`. Wraps `@aws-sdk/client-s3` configured for MinIO (`forcePathStyle: true`). Provides multipart upload orchestration (create, presigned part URLs, complete, abort), range-based `GetObject`, and presigned download URL generation. Auto-creates the bucket on module init.
+
+### Queue Module
+
+`QueueModule` (`src/queue/`) registers a BullMQ queue named `video` backed by Redis. `QueueService` enqueues `video.process` jobs with exponential backoff (3 attempts). The `VideoProcessJob` type carries `videoId`, `storageBucket`, and `storageKey`.
+
+### Video Worker
+
+A separate NestJS standalone application (`src/worker/`) — no HTTP server. Boots via `NestFactory.createApplicationContext(WorkerModule)`. The `VideoProcessor` (`@Processor('video')`) consumes `video.process` jobs: downloads from MinIO, runs `ffprobe` for metadata, runs `ffmpeg` for thumbnail generation (10% of duration or 5s), uploads the thumbnail to MinIO, and updates the video row in the database. Errors set the video status to `error` with a message.
+
 ## Code Conventions
 
 - **TypeScript:** `nodenext` module resolution, `ES2023` target, `strictNullChecks` on, `noImplicitAny` off

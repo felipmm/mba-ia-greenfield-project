@@ -1,2 +1,5 @@
 .history/
 settings.local.json
+.env
+.env.*
+!.env.example

@@ -24,8 +24,11 @@ export function createTestDataSource(
 }
 
 export async function cleanAllTables(dataSource: DataSource): Promise<void> {
-  await dataSource.query('DELETE FROM "refresh_tokens"');
-  await dataSource.query('DELETE FROM "verification_tokens"');
-  await dataSource.query('DELETE FROM "channels"');
-  await dataSource.query('DELETE FROM "users"');
+  // DELETE with TRUNCATE-like semantics, tolerant of missing tables.
+  // Deletion order respects FK dependencies.
+  await dataSource.query('DELETE FROM "videos" WHERE 1=1');
+  await dataSource.query('DELETE FROM "refresh_tokens" WHERE 1=1');
+  await dataSource.query('DELETE FROM "verification_tokens" WHERE 1=1');
+  await dataSource.query('DELETE FROM "channels" WHERE 1=1');
+  await dataSource.query('DELETE FROM "users" WHERE 1=1');
 }

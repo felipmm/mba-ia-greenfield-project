@@ -6,4 +6,4 @@ WORKDIR /home/node/app
 
 USER node
 
-CMD ["tail", "-f", "/dev/null"]
+CMD ["node", "dist/worker/main.worker.js"]

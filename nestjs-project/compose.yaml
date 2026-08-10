@@ -77,7 +77,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: ["tail", "-f", "/dev/null"]
+    command: ["npm", "run", "start:dev:worker"]
 
 volumes:
   minio_data:

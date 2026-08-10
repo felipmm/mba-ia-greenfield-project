@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { VideoProcessor } from './video.processor';
 import { StorageModule } from '../storage/storage.module';
+import { UsersModule } from '../users/users.module';
 import { VideosModule } from '../videos/videos.module';
 import databaseConfig from '../config/database.config';
 import queueConfig from '../config/queue.config';
@@ -57,6 +58,7 @@ import { VIDEO_PROCESS_QUEUE } from '../queue/queue.types';
     }),
     BullModule.registerQueue({ name: VIDEO_PROCESS_QUEUE }),
     StorageModule,
+    UsersModule,
     VideosModule,
   ],
   providers: [VideoProcessor],

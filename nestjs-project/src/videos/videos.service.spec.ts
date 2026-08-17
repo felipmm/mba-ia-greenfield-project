@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { VideosService } from './videos.service';
 import { Video, VideoStatus } from './entities/video.entity';
 
 describe('VideosService', () => {
   let service: VideosService;
-  let repository: Repository<Video>;
 
   const mockRepository = {
     create: jest.fn(),
@@ -30,7 +28,6 @@ describe('VideosService', () => {
     }).compile();
 
     service = module.get<VideosService>(VideosService);
-    repository = module.get<Repository<Video>>(getRepositoryToken(Video));
     jest.clearAllMocks();
   });
 

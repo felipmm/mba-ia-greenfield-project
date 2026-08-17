@@ -8,6 +8,27 @@ import { AppModule } from '../src/app.module';
 import { DomainExceptionFilter } from '../src/common/filters/domain-exception.filter';
 import { ValidationExceptionFilter } from '../src/common/filters/validation-exception.filter';
 import { AuthService } from '../src/auth/auth.service';
+import type { MailService } from '../src/mail/mail.service';
+
+interface PresignedPartUrl {
+  partNumber: number;
+  url: string;
+}
+
+interface InitiateUploadBody {
+  video: { id: string; urlHash: string; status: string };
+  uploadId: string;
+  presignedUrls: PresignedPartUrl[];
+  expiresAt: string;
+}
+
+interface LoginBody {
+  access_token: string;
+}
+
+interface ErrorBody {
+  message: string;
+}
 
 describe('Videos (e2e)', () => {
   let app: INestApplication<App>;
@@ -56,12 +77,15 @@ describe('Videos (e2e)', () => {
     password = 'password123',
   ): Promise<{ access_token: string; headers: Record<string, string> }> {
     const authService = app.get(AuthService);
-    const mailServiceInstance = (authService as any).mailService;
+    const mailServiceInstance = (
+      authService as unknown as { mailService: MailService }
+    ).mailService;
     let capturedToken = '';
     jest
       .spyOn(mailServiceInstance, 'sendConfirmationEmail')
-      .mockImplementationOnce(async (_e: string, _n: string, t: string) => {
+      .mockImplementationOnce((_e: string, _n: string, t: string) => {
         capturedToken = t;
+        return Promise.resolve();
       });
 
     await request(app.getHttpServer())
@@ -76,7 +100,7 @@ describe('Videos (e2e)', () => {
       .post('/auth/login')
       .send({ email, password });
 
-    const accessToken = res.body.access_token as string;
+    const accessToken = (res.body as LoginBody).access_token;
     return {
       access_token: accessToken,
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -95,7 +119,7 @@ describe('Videos (e2e)', () => {
         })
         .expect(401);
 
-      expect(res.body.message).toBeDefined();
+      expect((res.body as ErrorBody).message).toBeDefined();
     });
 
     it('returns 201 with presigned URLs for authenticated user', async () => {
@@ -112,13 +136,14 @@ describe('Videos (e2e)', () => {
         })
         .expect(201);
 
-      expect(res.body.video).toBeDefined();
-      expect(res.body.video.status).toBe('uploading');
-      expect(res.body.video.urlHash).toBeDefined();
-      expect(res.body.uploadId).toBeDefined();
-      expect(res.body.presignedUrls).toBeInstanceOf(Array);
-      expect(res.body.presignedUrls.length).toBe(1);
-      expect(res.body.expiresAt).toBeDefined();
+      const body = res.body as InitiateUploadBody;
+      expect(body.video).toBeDefined();
+      expect(body.video.status).toBe('uploading');
+      expect(body.video.urlHash).toBeDefined();
+      expect(body.uploadId).toBeDefined();
+      expect(body.presignedUrls).toBeInstanceOf(Array);
+      expect(body.presignedUrls.length).toBe(1);
+      expect(body.expiresAt).toBeDefined();
     });
 
     it('returns 400 when partCount exceeds max', async () => {
@@ -162,7 +187,9 @@ describe('Videos (e2e)', () => {
         })
         .expect(201);
 
-      expect(res1.body.video.urlHash).not.toBe(res2.body.video.urlHash);
+      const body1 = res1.body as InitiateUploadBody;
+      const body2 = res2.body as InitiateUploadBody;
+      expect(body1.video.urlHash).not.toBe(body2.video.urlHash);
     });
   });
 
